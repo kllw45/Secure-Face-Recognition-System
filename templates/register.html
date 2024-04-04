@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8">
+    <!-- 导入 Vue 3 -->
+    <script src="../static/js/vue.js"></script>
+    <link rel="stylesheet" href="../static/css/generalCSS.css">
+    <link rel="stylesheet" href="../static/css/register.css">
+    <link rel="stylesheet" href="../static/css/index.css">
+    <script src="../static/js/index.js"></script>
+    <script src="../static/js/axios.min.js"></script>
+    <script src="../static/js/face-api.js"></script>
+
+    <title>基于全同态加密的安全人脸识别</title>
+</head>
+
+<body>
+    <header class="clearfix">
+        <div id="nav" class="header w">
+            <div class="nav">
+                <ul>
+                    <li><a href="/">首页</a></li>
+                    <li class="active"><a class="active_a" href="/register">人脸录入</a></li>
+                    <li><a href="/recognition">人脸识别</a></li>
+                    <li><a href="/about">关于</a></li>
+                </ul>
+            </div>
+        </div>
+    </header>
+    <div id="content" class="content w">
+        <div v-show="user_choice" style="height: 320px; padding: 130px 50px 50px;">
+            <button id="uploadpic" value="上传图片" @click="pic_upload" style="display: none;"></button>
+            <button id="campic" value="拍摄" @click="take_pic" style="display: none;"></button>
+            <label class="cam_pic" for="uploadpic"><img src="../static/ico/pic.png" alt="">
+                <div>上传图片</div>
+            </label>
+            <label class="cam_pic" for="campic"><img src="../static/ico/cam.png" alt="">
+                <div>拍摄</div>
+            </label>
+        </div>
+
+        <div v-show="uploadpic" style="min-height: 320px; padding: 130px 50px 50px;">
+            <div style="margin-bottom: 30px;">
+                <el-button size="small" type="primary" icon="el-icon-caret-left" @click="back_choice(1)">返回</el-button>
+            </div>
+
+            <el-upload ref="upload" action="/upload" :on-preview="handlePreview" :on-remove="handleRemove"
+                :on-error="handelError" :on-success="handleSuccess" :file-list="fileList" list-type="picture"
+                :auto-upload="false" :http-request="addInfo" :limit="upload_num" :multiple="multi_up" :on-exceed="handleExceed">
+                <!--只能上传1个文件，limit指定1个文件-->
+                <el-button slot="trigger" icon="el-icon-picture-outline" size="small">点击选择图片</el-button>
+                <el-button style="margin-left: 10px;" size="small" type="info" icon="el-icon-edit" @click="submit">
+                    <span v-if="!multi_up">填写信息</span>
+                    <span v-else>批量上传</span>
+                </el-button>
+                <el-switch v-model="multi_up" active-color="#13ce66" @change="changenum"></el-switch>
+                <span style="color: #fff; font-size: 12px; display: none;">批量上传(开发者尊享，
+                    <i class="el-icon-success" style="color: #fbf2e0;"></i>多文件
+                    <i class="el-icon-success" style="color: #fbf2e0;"></i>免填写姓名)                   
+                </span>
+                <div slot="tip" class="el-upload__tip" style="color: #fff;">只能上传jpeg/png文件，且不超过2M</div>
+                <img style="display: none;" id="userFile" />
+            </el-upload>
+        </div>
+
+        <div v-show="takepic" style="text-align: center; height: 500px;">
+            <!-- 以下用于实时检测人脸 -->
+            <div style="position: relative;">
+                <canvas ref="overlay" style="position: absolute;"></canvas>                  
+                <video v-show="get_photo" ref="video" :width="videoWidth" :height="videoHeight"></video>
+                <canvas style="display: none;" id="canvasCamera" :width="videoWidth" :height="videoHeight"></canvas>             
+                <img :src="imgSrc" v-show="!get_photo" />
+            </div>
+            <!-- 以下是拍照用的按钮 -->
+            <div style="margin: 10px;">
+                <div id="options" style="display: inline-block; position: relative;">
+                    <div style="position: absolute; left: -200px;">
+                        <span style="color: #fff;">自动拍照(测试使用)</span>
+                        <el-switch v-model="autoDetect_dev" active-color="#13ce66"></el-switch>
+                    </div>                      
+                    <div>
+                        <el-switch v-model="autoDetect"></el-switch>
+                        <span style="color: #fff;">自动拍照</span>   
+                    </div>
+                </div>
+                
+                <el-button type="primary" icon="el-icon-caret-left" @click="back_choice(2)">返回</el-button>
+                <el-button plain icon="el-icon-video-camera-solid" @click="openCamera">打开摄像头</el-button>
+                <el-button type="primary" plain icon="el-icon-camera-solid" @click="setImage">拍照</el-button>
+                <el-button type="success" plain icon="el-icon-refresh-right" @click="reTake">重拍</el-button>
+                <el-button type="primary" @click="addInfo2">填写信息<i class="el-icon-edit"></i></el-button>
+                <el-button type="danger" @click="closeCamera">关闭摄像头</el-button>
+            </div>
+        </div>
+        <!-- 以下当检测到人脸时展示，让用户填写个人信息 -->
+        <div id="information" v-show="infoAdd" class="clearfix" style="padding-left: 50px; height: 500px;">
+            <div style="float: left;  margin: 10px 10px;">
+                <canvas id="cav2" style="display: none;"></canvas>
+                <img id="profile" :src="imgSrc2" width="210" alt="">
+            </div>
+            <div style="width: 300px; float: left; color: #fff; margin: 10px 10px;">
+                <ul>
+                    <li>姓名：<el-input v-model="username" placeholder="请输入姓名"></el-input></li>
+                    <li style="text-align: center;">
+                        <el-button type="primary" :icon="button_icon" 
+                        plain @click="uploadInfo" :disabled="button_disable">{{button_title}}</el-button>
+                        <el-button type="primary" @click="back_choice(3)">返回</el-button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <!-- 录入成功或失败信息v-show="resultInfo" v-show="resultInfo_succ"-->
+        <div id="retInfo" v-show="resultInfo"
+            style="text-align: center; color: #fff; font-size: 20px; padding-left: 50px; min-height: 500px;">
+            <div v-show="resultInfo_succ">
+                <i class="el-icon-success" style="color: #67C23A; font-size: 64px; display: block;"></i>
+                <p>您的信息录入成功，录入的信息如下：</p>
+                <div id="detail" style="padding-top: 20px;">
+                    <el-table border :data="name_label">
+                        <el-table-column prop="username" label="姓名" width="200">
+                        </el-table-column>
+                        <el-table-column prop="label" label="预分类标签" width="250">
+                        </el-table-column>
+                        <el-table-column label="操作">
+                            <template>
+                                <el-button type="primary" size="medium" :loading="button_feature" @click="getPlainFeature">查看明文</el-button>
+                                <el-button type="primary" size="medium" :loading="button_encrypt" @click="getEncryptData">查看密文</el-button>
+                                <el-button type="primary" size="medium" :loading="button_decrypt" @click="getDecryptData">解密</el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                    <el-table border :data="face_feature" max-height="200">
+                        <el-table-column label="人脸特征明文">
+                            <template  slot-scope="scope">
+                                <div v-html="scope.row.face_feature"></div>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                    <el-table border :data="face_encrypt" max-height="200">
+                        <el-table-column label="人脸特征密文（base64编码）">
+                            <template  slot-scope="scope">
+                                <div id="encryptdata">
+                                    {{scope.row.face_encrypt}}
+                                </div>
+                                <div style="text-align: center; width: 100%;">
+                                    <button type="button" @click="loadmore" class="el-button el-button--default el-button--mini is-round">
+                                        <span>{{loadtip}}</span>
+                                    </button>
+                                </div>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                    <el-table border :data="face_decrypt" max-height="200">
+                        <el-table-column label="人脸特征明文（解密）">
+                            <template  slot-scope="scope">
+                                <div v-html="scope.row.face_decrypt"></div>
+                            </template>
+                        </el-table-column>
+                        
+                    </el-table>
+                </div>
+            </div>
+            <div v-show="!resultInfo_succ">
+                <i class="el-icon-error" style="color: #f56c6c; font-size: 64px; display: block;"></i>
+                <p>您的信息录入失败</p>
+            </div>
+            <div style="margin-top: 30px;">
+                <el-button type="primary" size="medium" @click="back_choice(4)">返回</el-button>
+            </div>
+        </div>
+    </div>
+    <footer>
+        <div class="footer w">
+            <div class="copyright">
+                <p>©2023 XXX Corporation。保留所有权利。</p>
+            </div>
+        </div>
+    </footer>
+    <script src="../static/js/register.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,48 @@
+.content h1 {
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    color: #fff;
+    font-size: 60px;
+}
+.content {
+    /*padding: 130px 50px 50px;
+    width: 840px;
+    height: 470px;*/
+    padding: 10px 50px 50px;
+    width: 840px;
+}
+.content>.go {
+    text-align: center;
+    margin: 30px auto;
+}
+.content>.go>a {
+    color: #b8b6b4;
+    font-size: 40px;
+}
+.content>.go>a:hover {
+    color: #fff;
+}
+.cam_pic {
+    text-align: center;
+    color: #fff;
+    margin: 0px 50px;
+    width: 200px;
+    height: 200px;
+    display: inline-block;
+    border: 2px dashed #e3dddd;
+}
+.cam_pic:hover {
+    text-align: center;
+    color: #fff;
+    margin: 0px 50px;
+    width: 200px;
+    height: 200px;
+    display: inline-block;
+    border: 4px dashed #fff;
+    cursor: pointer;
+}
+
+#information ul li {
+    margin-bottom: 10px;
+}
